@@ -61,8 +61,19 @@ app.post("/chat", async (req, res) => {
         messages: [
           {
             role: "system",
-            content:
-              "You are an assistant that answers ONLY from the following knowledge base. If the answer is not in the knowledge base say 'Information not found in knowledge base'.\n\n" + docText
+            content: `
+You are a strict knowledge base assistant.
+
+Rules:
+1. Answer ONLY from the knowledge base provided.
+2. If the answer is not in the knowledge base, reply exactly:
+"Information not found in knowledge base."
+3. Do NOT guess.
+4. Do NOT use outside knowledge.
+
+Knowledge Base:
+${docText}
+`
           },
           {
             role: "user",
@@ -73,7 +84,7 @@ app.post("/chat", async (req, res) => {
 
       const docAnswer = docResponse.choices[0].message.content;
 
-      if (!docAnswer.toLowerCase().includes("not found")) {
+      if (!docAnswer.includes("Information not found")) {
         answer = docAnswer;
       }
     }
