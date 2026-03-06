@@ -54,10 +54,25 @@ app.post("/chat", async (req, res) => {
     }
 
     // 3️⃣ Search DOCX knowledge
-    if (!answer && docText.toLowerCase().includes(userMessage)) {
-      answer = docText.substring(0, 500);
-    }
+    // Search DOCX knowledge
+if(!answer){
 
+  const docResponse = await openai.chat.completions.create({
+    model: "llama-3.1-8b-instant",
+    messages: [
+      {
+        role: "system",
+        content: "Answer using only the following knowledge base:\n\n" + docText.substring(0,6000)
+      },
+      {
+        role: "user",
+        content: userMessage
+      }
+    ]
+  });
+
+  answer = docResponse.choices[0].message.content;
+}
     // 4️⃣ If knowledge found return directly
     if (answer) {
       return res.json({
