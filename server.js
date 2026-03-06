@@ -2,6 +2,7 @@ import express from "express";
 import OpenAI from "openai";
 import fs from "fs";
 import { readPDF } from "./pdfReader.js";
+import { readDOC } from "./docReader.js";
 
 const app = express();
 app.use(express.json());
@@ -15,6 +16,12 @@ const knowledgeBase = JSON.parse(
 let pdfText = "";
 (async () => {
   pdfText = await readPDF();
+})();
+
+// Load DOCX knowledge
+let docText = "";
+(async () => {
+  docText = await readDOC();
 })();
 
 // Groq connection
@@ -46,14 +53,19 @@ app.post("/chat", async (req, res) => {
       answer = pdfText.substring(0, 500);
     }
 
-    // 3️⃣ If knowledge found return directly
+    // 3️⃣ Search DOCX knowledge
+    if (!answer && docText.toLowerCase().includes(userMessage)) {
+      answer = docText.substring(0, 500);
+    }
+
+    // 4️⃣ If knowledge found return directly
     if (answer) {
       return res.json({
         content: answer
       });
     }
 
-    // 4️⃣ Otherwise ask AI
+    // 5️⃣ Otherwise ask AI
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages: [
