@@ -59,13 +59,22 @@ if (!answer && docText) {
 
   const lowerDoc = docText.toLowerCase();
 
-  if (lowerDoc.includes(userMessage)) {
+  const keywords = userMessage.split(" ");
 
-    const startIndex = lowerDoc.indexOf(userMessage);
+  let matchIndex = -1;
+
+  for (const word of keywords) {
+    if (word.length > 3 && lowerDoc.includes(word)) {
+      matchIndex = lowerDoc.indexOf(word);
+      break;
+    }
+  }
+
+  if (matchIndex !== -1) {
 
     const context = docText.substring(
-      Math.max(0, startIndex - 300),
-      startIndex + 500
+      Math.max(0, matchIndex - 300),
+      matchIndex + 500
     );
 
     const docResponse = await openai.chat.completions.create({
