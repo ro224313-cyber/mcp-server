@@ -12,7 +12,7 @@ const knowledgeBase = JSON.parse(
   fs.readFileSync("./knowledge.json", "utf8")
 );
 
-// Load PDF once (performance better)
+// Load PDF knowledge
 let pdfText = "";
 (async () => {
   pdfText = await readPDF();
@@ -49,30 +49,35 @@ app.post("/chat", async (req, res) => {
     }
 
     // 2️⃣ Search PDF knowledge
-    if (!answer && pdfText.toLowerCase().includes(userMessage)) {
+    if (!answer && pdfText && pdfText.toLowerCase().includes(userMessage)) {
       answer = pdfText.substring(0, 500);
     }
 
-    // 3️⃣ Search DOCX knowledge
-    // Search DOCX knowledge
-if(!answer){
+    // 3️⃣ Search DOCX knowledge using AI
+    if (!answer && docText) {
 
-  const docResponse = await openai.chat.completions.create({
-    model: "llama-3.1-8b-instant",
-    messages: [
-      {
-        role: "system",
-        content: "Answer using only the following knowledge base:\n\n" + docText.substring(0,6000)
-      },
-      {
-        role: "user",
-        content: userMessage
+      const docResponse = await openai.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an assistant that answers ONLY from the following knowledge base. If the answer is not in the knowledge base say 'Information not found in knowledge base'.\n\n" + docText
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ]
+      });
+
+      const docAnswer = docResponse.choices[0].message.content;
+
+      if (!docAnswer.toLowerCase().includes("not found")) {
+        answer = docAnswer;
       }
-    ]
-  });
+    }
 
-  answer = docResponse.choices[0].message.content;
-}
     // 4️⃣ If knowledge found return directly
     if (answer) {
       return res.json({
@@ -80,13 +85,13 @@ if(!answer){
       });
     }
 
-    // 5️⃣ Otherwise ask AI
+    // 5️⃣ AI fallback
     const response = await openai.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant. Answer clearly."
+          content: "You are a helpful assistant."
         },
         {
           role: "user",
