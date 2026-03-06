@@ -12,13 +12,13 @@ const knowledgeBase = JSON.parse(
   fs.readFileSync("./knowledge.json", "utf8")
 );
 
-// Load PDF knowledge
+// Load PDF
 let pdfText = "";
 (async () => {
   pdfText = await readPDF();
 })();
 
-// Load DOCX knowledge
+// Load DOCX
 let docText = "";
 (async () => {
   docText = await readDOC();
@@ -30,72 +30,63 @@ const openai = new OpenAI({
   baseURL: "https://api.groq.com/openai/v1"
 });
 
-// Chat endpoint
 app.post("/chat", async (req, res) => {
 
-  const userMessage = req.body.message.toLowerCase();
+  const userMessage = req.body.message;
 
   try {
 
     let answer = null;
 
-    // 1️⃣ Search JSON knowledge
+    // 1️⃣ JSON search
     const result = knowledgeBase.find(item =>
-      userMessage.includes(item.question.toLowerCase())
+      userMessage.toLowerCase().includes(item.question.toLowerCase())
     );
 
     if (result) {
       answer = result.answer;
     }
 
-    // 2️⃣ Search PDF knowledge
-    if (!answer && pdfText && pdfText.toLowerCase().includes(userMessage)) {
+    // 2️⃣ PDF search
+    if (!answer && pdfText.toLowerCase().includes(userMessage.toLowerCase())) {
       answer = pdfText.substring(0, 500);
     }
 
-    // 3️⃣ Search DOCX knowledge using AI
-  // 3️⃣ Search DOCX knowledge using keyword match
-if (!answer && docText) {
+    // 3️⃣ DOC knowledge search using AI
+    if (!answer && docText) {
 
-  const lowerDoc = docText.toLowerCase();
+      const context = docText.substring(0, 5000);
 
-  const keywords = userMessage.split(" ");
+      const response = await openai.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content: `
+You are an AI assistant that answers questions ONLY from the knowledge base.
 
-  let matchIndex = -1;
+If the answer is not in the knowledge base, say:
+"Information not found in knowledge base."
 
-  for (const word of keywords) {
-    if (word.length > 3 && lowerDoc.includes(word)) {
-      matchIndex = lowerDoc.indexOf(word);
-      break;
+Knowledge Base:
+${context}
+`
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ]
+      });
+
+      const docAnswer = response.choices[0].message.content;
+
+      if (!docAnswer.toLowerCase().includes("not found")) {
+        answer = docAnswer;
+      }
     }
-  }
 
-  if (matchIndex !== -1) {
-
-    const context = docText.substring(
-      Math.max(0, matchIndex - 300),
-      matchIndex + 500
-    );
-
-    const docResponse = await openai.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content: "Answer using ONLY the provided context."
-        },
-        {
-          role: "user",
-          content: `Context:\n${context}\n\nQuestion: ${userMessage}`
-        }
-      ]
-    });
-
-    answer = docResponse.choices[0].message.content;
-  }
-}
-
-    // 4️⃣ If knowledge found return directly
+    // 4️⃣ If answer found
     if (answer) {
       return res.json({
         content: answer
@@ -122,10 +113,8 @@ if (!answer && docText) {
     });
 
   } catch (error) {
-
     console.error(error);
     res.status(500).send("Server error");
-
   }
 
 });
