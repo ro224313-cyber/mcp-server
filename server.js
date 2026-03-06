@@ -54,40 +54,37 @@ app.post("/chat", async (req, res) => {
     }
 
     // 3️⃣ Search DOCX knowledge using AI
-    if (!answer && docText) {
+  // 3️⃣ Search DOCX knowledge using keyword match
+if (!answer && docText) {
 
-      const docResponse = await openai.chat.completions.create({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: `
-You are a strict knowledge base assistant.
+  const lowerDoc = docText.toLowerCase();
 
-Rules:
-1. Answer ONLY from the knowledge base provided.
-2. If the answer is not in the knowledge base, reply exactly:
-"Information not found in knowledge base."
-3. Do NOT guess.
-4. Do NOT use outside knowledge.
+  if (lowerDoc.includes(userMessage)) {
 
-Knowledge Base:
-${docText}
-`
-          },
-          {
-            role: "user",
-            content: userMessage
-          }
-        ]
-      });
+    const startIndex = lowerDoc.indexOf(userMessage);
 
-      const docAnswer = docResponse.choices[0].message.content;
+    const context = docText.substring(
+      Math.max(0, startIndex - 300),
+      startIndex + 500
+    );
 
-      if (!docAnswer.includes("Information not found")) {
-        answer = docAnswer;
-      }
-    }
+    const docResponse = await openai.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        {
+          role: "system",
+          content: "Answer using ONLY the provided context."
+        },
+        {
+          role: "user",
+          content: `Context:\n${context}\n\nQuestion: ${userMessage}`
+        }
+      ]
+    });
+
+    answer = docResponse.choices[0].message.content;
+  }
+}
 
     // 4️⃣ If knowledge found return directly
     if (answer) {
